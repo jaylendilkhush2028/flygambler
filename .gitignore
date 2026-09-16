@@ -1,0 +1,18 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Large connectome data (regenerable / downloadable — see data/README.md)
+data/*
+!data/README.md
+
+# Simulation outputs (regenerable)
+runs/
+
+# Local editor / dev config
+.claude/
+
+# OS
+.DS_Store

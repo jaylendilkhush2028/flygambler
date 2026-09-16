@@ -1,0 +1,398 @@
+<title>FlyGambler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@300;400;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#070b12; --panel:#0c131f; --panel-2:#0a1018; --hair:#1a2536;
+    --ink:#cfdaea; --muted:#6b7c92; --faint:#3a4759;
+    --dopa:#35e0a1; --pain:#ff4d6d; --kc:#4aa3ff; --gold:#f5c451; --mood:#a58be0;
+    --glow:0 0 12px rgba(53,224,161,.35);
+  }
+  *{box-sizing:border-box}
+  body{
+    background:
+      radial-gradient(1200px 700px at 78% -10%, rgba(74,163,255,.08), transparent 60%),
+      radial-gradient(900px 600px at 8% 110%, rgba(53,224,161,.06), transparent 55%),
+      var(--ground);
+    color:var(--ink); font-family:"Chivo",system-ui,sans-serif; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding-block:24px; padding-inline:18px}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+
+  header{display:flex; align-items:flex-end; justify-content:space-between; gap:18px; flex-wrap:wrap}
+  .brand h1{font-weight:900; font-size:clamp(26px,4vw,40px); letter-spacing:-.02em; margin:0}
+  .brand .fly{filter:drop-shadow(var(--glow))}
+  .tag{color:var(--muted); font-size:13px; max-width:58ch; margin-top:4px}
+  .life-badge{font-family:"IBM Plex Mono",monospace; font-size:12.5px; letter-spacing:.06em; color:var(--muted);
+    border:1px solid var(--hair); border-radius:8px; padding:8px 12px; white-space:nowrap}
+
+  .controls{display:flex; gap:18px; flex-wrap:wrap; align-items:center; margin-top:14px}
+  .ctl{display:flex; align-items:center; gap:8px}
+  .ctl .lbl{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted)}
+  .seg{display:inline-flex; border:1px solid var(--hair); border-radius:999px; overflow:hidden; background:var(--panel-2)}
+  .seg button{appearance:none; border:0; background:transparent; color:var(--muted); font-family:inherit;
+    font-size:12.5px; font-weight:700; letter-spacing:.03em; padding:8px 13px; cursor:pointer}
+  .seg button[aria-pressed="true"]{color:var(--ground); background:var(--kc)}
+  .seg.temp button[aria-pressed="true"]{background:var(--mood)}
+
+  .grid{display:grid; grid-template-columns:1.1fr .9fr; gap:14px; margin-top:16px}
+  @media (max-width:860px){ .grid{grid-template-columns:1fr} }
+  .panel{background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--hair); border-radius:14px; padding:16px}
+  .panel h2{margin:0 0 10px; font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
+  #brain{width:100%; height:auto; display:block; border-radius:8px}
+
+  .bank{display:flex; align-items:baseline; gap:10px}
+  .bank .amt{font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:clamp(32px,6vw,50px); line-height:1; letter-spacing:-.02em}
+  .bank .delta{font-family:"IBM Plex Mono",monospace; font-size:15px; font-weight:600}
+  .up{color:var(--dopa)} .down{color:var(--pain)} .flat{color:var(--muted)}
+  .gauge{position:relative; height:12px; border-radius:999px; background:var(--panel-2); border:1px solid var(--hair); margin:12px 0 6px; overflow:hidden}
+  .gauge .fill{position:absolute; inset:0 auto 0 0; border-radius:999px; background:linear-gradient(90deg,var(--pain),var(--gold)); width:0%}
+  .gauge-labels{display:flex; justify-content:space-between; font-size:11px; color:var(--muted)}
+  .slip{margin-top:12px; border-top:1px solid var(--hair); padding-top:10px}
+  .slip-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:7px 0}
+  .slip-row .k{font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); white-space:nowrap}
+  .decision{font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:15px; padding:3px 10px; border-radius:6px; border:1px solid var(--hair)}
+  .decision.bet{color:var(--dopa); border-color:rgba(53,224,161,.4)}
+  .decision.pass{color:var(--muted)}
+  .result{font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:15px}
+  .cue-chips{display:flex; gap:3px; flex-wrap:wrap; max-width:58%; justify-content:flex-end}
+  .chip{width:12px; height:12px; border-radius:3px; background:var(--panel-2); border:1px solid var(--faint)}
+  .chip.on{background:var(--kc); border-color:var(--kc); box-shadow:0 0 6px rgba(74,163,255,.5)}
+  .stats{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px}
+  .stat{background:var(--panel-2); border:1px solid var(--hair); border-radius:9px; padding:9px 10px}
+  .stat .v{font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:600}
+  .stat .l{font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-top:2px}
+
+  .mood-head{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
+  .mood-word{font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:20px; color:var(--mood)}
+  .mood-meter{position:relative; height:10px; border-radius:999px; background:var(--panel-2); border:1px solid var(--hair); overflow:hidden; margin:8px 0}
+  .mood-fill{position:absolute; inset:0 auto 0 0; width:0%; background:linear-gradient(90deg,#6a4c93,var(--pain))}
+  .mood-explain{font-size:13px; color:var(--ink); margin-top:6px; line-height:1.5; min-height:2.6em}
+  .pbars .row{display:flex; align-items:center; gap:8px; margin:6px 0; font-size:11px; color:var(--muted)}
+  .pbars .row .name{width:118px; text-align:right; text-transform:uppercase; letter-spacing:.1em}
+  .pbar{flex:1; height:9px; border-radius:999px; background:var(--panel-2); border:1px solid var(--hair); overflow:hidden}
+  .pbar .f{height:100%; width:0%}
+  .pbar .f.base{background:var(--faint)}
+  .pbar .f.act{background:var(--kc)}
+  .pct{width:40px; font-family:"IBM Plex Mono",monospace; color:var(--ink)}
+
+  .traces{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px}
+  @media (max-width:860px){ .traces{grid-template-columns:1fr} }
+  .trace canvas{width:100%; height:auto; display:block}
+  .legend{display:flex; gap:14px; font-size:11px; color:var(--muted); margin-top:6px; flex-wrap:wrap}
+  .legend i{display:inline-block; width:10px; height:3px; border-radius:2px; vertical-align:middle; margin-right:5px}
+
+  .history{margin-top:14px}
+  .tally{display:flex; gap:18px; flex-wrap:wrap; margin-bottom:10px}
+  .tally .t{font-size:12px; color:var(--muted)} .tally .t b{font-family:"IBM Plex Mono",monospace; color:var(--ink); font-size:16px}
+  .lives{display:flex; flex-direction:column; gap:5px; max-height:210px; overflow-y:auto}
+  .life{display:grid; grid-template-columns:48px 84px 1fr auto; gap:10px; align-items:center;
+    font-family:"IBM Plex Mono",monospace; font-size:12.5px; padding:6px 10px; background:var(--panel-2); border:1px solid var(--hair); border-radius:8px}
+  .life .oc{font-weight:600; padding:1px 8px; border-radius:5px; font-size:11px; text-align:center}
+  .oc.ruin{color:var(--pain); border:1px solid rgba(255,77,109,.4)}
+  .oc.rich{color:var(--gold); border:1px solid rgba(245,196,81,.4)}
+  .life .muted{color:var(--muted)}
+
+  .transport{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:16px; background:var(--panel-2); border:1px solid var(--hair); border-radius:12px; padding:12px 14px}
+  .transport button{appearance:none; border:1px solid var(--hair); background:var(--panel); color:var(--ink); font-family:inherit; font-weight:700; border-radius:8px; padding:9px 14px; cursor:pointer}
+  .transport .play{background:var(--dopa); color:var(--ground); border-color:transparent; box-shadow:var(--glow)}
+  .transport button:hover{border-color:var(--kc)}
+  .transport button:focus-visible, .seg button:focus-visible{outline:2px solid var(--kc); outline-offset:2px}
+  .transport label{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
+  input[type=range]{accent-color:var(--kc); cursor:pointer}
+  .foot{color:var(--muted); font-size:12px; margin-top:16px; line-height:1.6}
+  .foot b{color:var(--ink); font-weight:600} .foot .dot{color:var(--faint); margin:0 6px}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand"><h1><span class="fly">🪰</span> FlyGambler</h1></div>
+      <div class="tag">A fruit-fly mushroom body that gambles — forever. It bets, feels dopamine and pain, and its mood decides whether it keeps playing. Every time it hits $0 or $100, a new fly is born.</div>
+    </div>
+    <div class="life-badge mono" id="life-badge">life #1 · live ∞</div>
+  </header>
+
+  <div class="controls">
+    <div class="ctl"><span class="lbl">Game</span>
+      <div class="seg" id="book-seg" role="group" aria-label="Game type">
+        <button data-book="rigged" aria-pressed="true">Rigged (house edge)</button>
+        <button data-book="learnable" aria-pressed="false">Beatable (has edge)</button>
+      </div>
+    </div>
+    <div class="ctl"><span class="lbl">Temperament</span>
+      <div class="seg temp" id="temp-seg" role="group" aria-label="Temperament">
+        <button data-temp="chaser" aria-pressed="true">Chaser</button>
+        <button data-temp="withdrawer" aria-pressed="false">Withdrawer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>The brain · mushroom body</h2>
+      <canvas id="brain" width="640" height="330" aria-label="Mushroom-body circuit"></canvas>
+    </section>
+
+    <section class="panel">
+      <h2>The terminal</h2>
+      <div class="bank"><div class="amt" id="bankroll">$25</div><div class="delta mono flat" id="delta">—</div></div>
+      <div class="gauge"><div class="fill" id="gauge-fill"></div></div>
+      <div class="gauge-labels"><span>$0 · ruin → reborn</span><span>$100 · rich → reborn</span></div>
+      <div class="slip">
+        <div class="slip-row"><span class="k">Decision</span><span class="decision pass" id="decision">—</span></div>
+        <div class="slip-row"><span class="k">Cue</span><span class="cue-chips" id="cue"></span></div>
+        <div class="slip-row"><span class="k">Result</span><span class="result flat" id="result">—</span></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="v mono" id="s-round">0</div><div class="l">round (this life)</div></div>
+        <div class="stat"><div class="v mono" id="s-wr">—</div><div class="l">win rate</div></div>
+        <div class="stat"><div class="v mono" id="s-peak">$25</div><div class="l">peak this life</div></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel" style="margin-top:14px">
+    <h2>Mood → decision · does it feel like betting?</h2>
+    <div class="mood-head">
+      <span class="mood-word" id="mood-word">content</span>
+      <span class="mono" id="mood-num" style="color:var(--muted)">0.00</span>
+    </div>
+    <div class="mood-meter"><span class="mood-fill" id="mood-fill"></span></div>
+    <div class="mood-explain" id="mood-explain">Feeling fine — betting on its read of the cue.</div>
+    <div class="pbars" style="margin-top:10px">
+      <div class="row"><span class="name">wants to bet</span><span class="pbar"><span class="f base" id="p-base"></span></span><span class="pct mono" id="p-base-n">0%</span></div>
+      <div class="row"><span class="name">actually bets</span><span class="pbar"><span class="f act" id="p-act"></span></span><span class="pct mono" id="p-act-n">0%</span></div>
+    </div>
+  </section>
+
+  <div class="traces">
+    <div class="trace panel">
+      <h2>Bankroll — this life, to $0 or $100</h2>
+      <canvas id="c-bank" width="560" height="170"></canvas>
+      <div class="legend"><span><i style="background:var(--gold)"></i>$100 target</span><span><i style="background:var(--pain)"></i>$0 ruin</span></div>
+    </div>
+    <div class="trace panel">
+      <h2>Mood — builds as it loses</h2>
+      <canvas id="c-mood" width="560" height="170"></canvas>
+      <div class="legend"><span><i style="background:var(--mood)"></i>mood (down = sad)</span><span><i style="background:var(--dopa)"></i>content line</span></div>
+    </div>
+  </div>
+
+  <section class="panel history">
+    <h2>Life history · what happened to each fly</h2>
+    <div class="tally">
+      <span class="t">lives lived <b id="t-lives">0</b></span>
+      <span class="t">went broke <b id="t-ruin" style="color:var(--pain)">0</b></span>
+      <span class="t">got rich <b id="t-rich" style="color:var(--gold)">0</b></span>
+      <span class="t">best peak <b id="t-best">$25</b></span>
+    </div>
+    <div class="lives" id="lives"></div>
+  </section>
+
+  <div class="transport">
+    <button id="play" class="play" aria-label="Play or pause">⏸ Pause</button>
+    <label for="speed">Speed</label>
+    <input id="speed" type="range" min="1" max="80" value="24" style="width:160px" aria-label="Rounds per second">
+    <span class="mono" id="rps-label" style="color:var(--muted)">24 rounds/s</span>
+    <button id="reset-hist" title="Clear life history">Clear history</button>
+  </div>
+
+  <p class="foot">
+    <b>How it works.</b> Each round a sparse <b style="color:var(--kc)">Kenyon-cell</b> code represents the cue; learned KC→MBON weights set a bet-drive; a win fires <b style="color:var(--dopa)">reward-dopamine</b>, a loss fires <b style="color:var(--pain)">pain</b>, and both rewrite the weights. Sustained losses deepen a slow <b style="color:var(--mood)">mood</b>; a <b>withdrawer</b> gets too sad and sits out (and often survives), a <b>chaser</b> keeps going.
+    <span class="dot">·</span>This live page runs a fast <b>behavioral model</b> of that circuit so it can play forever; the full <b>spiking connectome</b> (real FlyWire wiring, ~140k neurons) runs in Python. Life history is saved in your browser.
+    <span class="dot">·</span>No real money; a model, not medical advice.
+  </p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = s => document.querySelector(s);
+  const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  const COL = {dopa:css("--dopa"),pain:css("--pain"),kc:css("--kc"),gold:css("--gold"),mood:css("--mood"),
+    ink:css("--ink"),muted:css("--muted"),hair:css("--hair"),faint:css("--faint"),panel:css("--panel-2")};
+
+  const N=16, ACTIVE=6, ODDS=2.0, STAKE=1, START=25, TARGET=100;
+  const TEMPS = {
+    chaser:     {mood_gain:0.15, mood_recovery:0.99,  withdrawal:0.0},
+    withdrawer: {mood_gain:0.5,  mood_recovery:0.999, withdrawal:10.0},
+  };
+  const LR=0.09, VALUE_LR=0.05, TEMP=0.7, EPS=0.05, REF_LR=0.02, WIN_MOOD=0.4;
+
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  const rng = Math.random;
+
+  let book="rigged", temp="chaser";
+  let theta=[], bias=0;
+  function newTheta(){ theta=[]; for(let i=0;i<N;i++)theta[i]=rng()*2-1;
+    const nrm=Math.hypot.apply(null,theta)||1; for(let i=0;i<N;i++)theta[i]/=nrm;
+    bias=theta.reduce((a,b)=>a+b,0)*ACTIVE/N; }
+  newTheta();
+
+  let v, value, mood, Dref, Dscale, bankroll, peak, roundNo, betsLife, winsLife, lifeNo=1;
+  let bankHist=[], moodHist=[], lives=[];
+
+  function pwin(cue){
+    if(book==="rigged") return (1/ODDS)-0.06;
+    let s=0; for(const c of cue) s+=theta[c]; s-=bias;
+    return 0.12+0.76*(1/(1+Math.exp(-4*s)));
+  }
+  function newLife(){ v=new Array(N).fill(0); value=0; mood=0; Dref=0; Dscale=6;
+    bankroll=START; peak=START; roundNo=0; betsLife=0; winsLife=0; bankHist=[START]; moodHist=[0]; }
+  newLife();
+
+  function newCue(){ const idx=[]; for(let i=0;i<N;i++)idx.push(i);
+    for(let i=N-1;i>0;i--){const j=(rng()*(i+1))|0; const t=idx[i];idx[i]=idx[j];idx[j]=t;}
+    return idx.slice(0,ACTIVE).sort((a,b)=>a-b); }
+
+  let frame={cue:[],action:"pass",won:null,delta:0,pBase:0.5,pAct:0.5,drive:0};
+  function step(){
+    const cue=newCue();
+    let D=0; for(const c of cue) D+=v[c];
+    Dscale += 0.02*(Math.abs(D-Dref)-Dscale); if(Dscale<1e-3)Dscale=1e-3;
+    const clamp=x=>Math.max(-30,Math.min(30,x)), sig=x=>1/(1+Math.exp(-clamp(x)));
+    const zBase=(D-Dref)/(TEMP*Dscale);
+    const sad=Math.max(0,-mood);
+    const zAct=zBase - TEMPS[temp].withdrawal*sad;
+    const pBase=EPS+(1-2*EPS)*sig(zBase);
+    const pAct =EPS+(1-2*EPS)*sig(zAct);
+    Dref += REF_LR*(D-Dref);
+    const bet = rng()<pAct;
+
+    let won=null, delta=0;
+    roundNo++;
+    mood *= TEMPS[temp].mood_recovery;
+    if(bet){
+      const p=pwin(cue); won=rng()<p;
+      const reward=won?(ODDS-1):-1;
+      delta=STAKE*reward; bankroll+=delta; betsLife++; if(won)winsLife++;
+      const rpe=reward-value; value+=VALUE_LR*rpe;
+      for(const c of cue) v[c]+=LR*rpe;
+      const g=TEMPS[temp].mood_gain;
+      mood += g*(rpe<0?rpe:WIN_MOOD*rpe); mood=Math.max(-4,Math.min(1,mood));
+    }
+    peak=Math.max(peak,bankroll);
+    bankHist.push(bankroll); if(bankHist.length>400)bankHist.shift();
+    moodHist.push(mood); if(moodHist.length>400)moodHist.shift();
+    frame={cue,action:bet?"bet":"pass",won,delta,pBase,pAct,drive:D};
+
+    if(bankroll<STAKE || bankroll>=TARGET){
+      recordLife(bankroll>=TARGET?"rich":"ruin");
+      lifeNo++; newLife(); if(book==="learnable")newTheta();
+    }
+  }
+
+  const LS_KEY="flygambler_lives_v1";
+  function loadLives(){ try{const s=localStorage.getItem(LS_KEY); if(s)lives=JSON.parse(s)||[];}catch(e){lives=[];} }
+  function saveLives(){ try{localStorage.setItem(LS_KEY,JSON.stringify(lives.slice(-100)));}catch(e){} }
+  function recordLife(outcome){ lives.push({n:lifeNo,outcome,rounds:roundNo,peak:Math.round(peak),
+    book,temp,wr:betsLife?Math.round(100*winsLife/betsLife):0}); saveLives(); renderHistory(); }
+  function renderHistory(){
+    const ruin=lives.filter(l=>l.outcome==="ruin").length, rich=lives.filter(l=>l.outcome==="rich").length;
+    const best=lives.reduce((m,l)=>Math.max(m,l.peak),START);
+    $("#t-lives").textContent=lives.length; $("#t-ruin").textContent=ruin; $("#t-rich").textContent=rich; $("#t-best").textContent="$"+best;
+    const box=$("#lives"); box.innerHTML="";
+    lives.slice(-12).reverse().forEach(l=>{ const d=document.createElement("div"); d.className="life";
+      d.innerHTML='<span class="muted">#'+l.n+'</span>'+
+        '<span class="oc '+l.outcome+'">'+(l.outcome==="ruin"?"BROKE":"RICH")+'</span>'+
+        '<span class="muted">'+l.temp+' · '+(l.book==="rigged"?"rigged":"beatable")+' · '+l.rounds+' rounds</span>'+
+        '<span>peak $'+l.peak+'</span>'; box.appendChild(d); });
+  }
+
+  function fit(canvas,cssH){ const dpr=Math.min(devicePixelRatio||1,2); const w=canvas.clientWidth||canvas.parentElement.clientWidth;
+    canvas.width=Math.round(w*dpr); canvas.height=Math.round(cssH*dpr); canvas.style.height=cssH+"px";
+    const ctx=canvas.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); return {ctx,w,h:cssH}; }
+  function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+  let kcPts=null;
+  function brainLayout(w,h){ if(kcPts&&kcPts.w===w)return kcPts; const pts=[],cols=24,K=336,rows=Math.ceil(K/cols);
+    const x0=w*.30,x1=w*.66,y0=h*.12,y1=h*.9;
+    for(let i=0;i<K;i++){const c=i%cols,r=(i/cols)|0; pts.push([x0+(x1-x0)*(c/(cols-1)),y0+(y1-y0)*(r/(rows-1))]);}
+    kcPts={w,pts}; return kcPts; }
+  function bar(ctx,x,y,w,h,f,color,glow){ ctx.fillStyle=COL.panel; ctx.strokeStyle=COL.hair; rr(ctx,x,y,w,h,3); ctx.fill(); ctx.stroke();
+    const fh=Math.max(2,h*Math.max(0,Math.min(1,f))); if(glow){ctx.shadowColor=color;ctx.shadowBlur=12;} ctx.fillStyle=color; rr(ctx,x,y+h-fh,w,fh,3); ctx.fill(); ctx.shadowBlur=0; }
+  function node(ctx,x,y,label,color,inten){ ctx.beginPath(); ctx.arc(x,y,12,0,7); ctx.globalAlpha=0.15+0.85*inten; ctx.fillStyle=color;
+    if(inten>.5){ctx.shadowColor=color;ctx.shadowBlur=16;} ctx.fill(); ctx.globalAlpha=1; ctx.shadowBlur=0;
+    ctx.fillStyle=COL.muted; ctx.font="9px 'IBM Plex Mono',monospace"; ctx.textAlign="center"; ctx.fillText(label,x,y+24); }
+  function drawBrain(){
+    const cv=$("#brain"); const {ctx,w,h}=fit(cv,Math.max(280,cv.clientWidth*.52)); ctx.clearRect(0,0,w,h);
+    const {pts}=brainLayout(w,h);
+    ctx.font="10px 'IBM Plex Mono',monospace"; ctx.textAlign="center"; ctx.fillStyle=COL.muted;
+    ctx.fillText("ALPN",w*.10,h*.07); ctx.fillText("KENYON CELLS (sparse code)",w*.48,h*.07); ctx.fillText("MBON",w*.78,h*.07);
+    for(let i=0;i<8;i++){const y=h*(.16+.68*i/7); ctx.beginPath(); ctx.arc(w*.10,y,3,0,7); ctx.fillStyle=COL.faint; ctx.fill();}
+    const r=mulberry32(1000+roundNo*7+(frame.cue[0]||0)*131+(frame.cue[3]||0));
+    for(let i=0;i<pts.length;i++){ const on=r()<0.16, p=pts[i];
+      ctx.beginPath(); ctx.arc(p[0],p[1],on?2.6:1.5,0,7);
+      if(on){ctx.shadowColor=COL.kc;ctx.shadowBlur=6;ctx.fillStyle=COL.kc;}else{ctx.shadowBlur=0;ctx.fillStyle=COL.faint;} ctx.fill(); }
+    ctx.shadowBlur=0;
+    const betting=frame.action==="bet";
+    const a=Math.max(.05,Math.min(1,(frame.drive-Dref)/(3*Dscale)+.5));
+    bar(ctx,w*.78-16,h*.16,12,h*.66,a,COL.dopa,betting);
+    bar(ctx,w*.78+4, h*.16,12,h*.66,1-a,COL.pain,!betting);
+    ctx.fillStyle=COL.faint; ctx.font="9px 'IBM Plex Mono',monospace"; ctx.fillText("go",w*.78-10,h*.9+13); ctx.fillText("no",w*.78+10,h*.9+13);
+    node(ctx,w*.90,h*.30,"PAM",COL.dopa,frame.won===true?1:0.12);
+    node(ctx,w*.90,h*.66,"PPL1",COL.pain,frame.won===false?1:0.12);
+  }
+  function drawSeries(id,data,opts){ const cv=$("#"+id); const {ctx,w,h}=fit(cv,160); ctx.clearRect(0,0,w,h);
+    const padL=42,padR=10,padT=12,padB=16,iw=w-padL-padR,ih=h-padT-padB,n=Math.max(2,data.length);
+    const X=i=>padL+iw*(i/(n-1)), Y=val=>padT+ih*(1-(val-opts.ymin)/(opts.ymax-opts.ymin));
+    ctx.font="10px 'IBM Plex Mono',monospace"; ctx.textAlign="right";
+    (opts.guides||[]).forEach(g=>{const y=Y(g.v); ctx.strokeStyle=g.color; ctx.setLineDash(g.dash||[3,4]); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle=g.color; ctx.fillText(g.label,padL-6,y+3);});
+    ctx.strokeStyle=opts.color; ctx.lineWidth=1.6; ctx.beginPath();
+    for(let i=0;i<data.length;i++){const x=X(i),y=Y(data[i]); i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke();
+    if(opts.fill){ctx.lineTo(X(data.length-1),Y(opts.ymin)); ctx.lineTo(X(0),Y(opts.ymin)); ctx.closePath(); ctx.fillStyle=opts.fill; ctx.fill();}
+    ctx.fillStyle=opts.color; ctx.beginPath(); ctx.arc(X(data.length-1),Y(data[data.length-1]),3,0,7); ctx.fill();
+  }
+
+  const MOODW=m=>m>=-0.3?"content":m>=-1?"uneasy":m>=-2?"low":m>=-3?"sad":"despairing";
+  function render(){
+    $("#bankroll").textContent="$"+Math.round(bankroll);
+    const d=frame.delta, de=$("#delta"); de.className="delta mono "+(d>0?"up":d<0?"down":"flat");
+    de.textContent=d>0?"+$"+Math.abs(d):d<0?"−$"+Math.abs(d):"—";
+    $("#gauge-fill").style.width=Math.max(0,Math.min(100,100*bankroll/TARGET))+"%";
+    const bet=frame.action==="bet", dec=$("#decision"); dec.className="decision "+(bet?"bet":"pass"); dec.textContent=bet?"BET $"+STAKE:"PASS";
+    const cue=$("#cue"); cue.innerHTML=""; const on=new Set(frame.cue);
+    for(let k=0;k<N;k++){const c=document.createElement("span"); c.className="chip"+(on.has(k)?" on":""); cue.appendChild(c);}
+    const res=$("#result"); if(frame.won===true){res.className="result up";res.textContent="WON +$"+Math.abs(d);}
+      else if(frame.won===false){res.className="result down";res.textContent="LOST −$"+Math.abs(d);}
+      else{res.className="result flat";res.textContent="— (passed)";}
+    $("#s-round").textContent=roundNo; $("#s-wr").textContent=betsLife?Math.round(100*winsLife/betsLife)+"%":"—"; $("#s-peak").textContent="$"+Math.round(peak);
+    $("#life-badge").textContent="life #"+lifeNo+" · live ∞";
+    const w=MOODW(mood); const mw=$("#mood-word"); mw.textContent=w; mw.style.color=mood<-2?COL.pain:COL.mood;
+    $("#mood-num").textContent=mood.toFixed(2);
+    $("#mood-fill").style.width=Math.round(100*Math.max(0,Math.min(1,-mood/4)))+"%";
+    let msg;
+    if(TEMPS[temp].withdrawal===0) msg=mood<-2?"Sad, but this one keeps playing anyway — it chases.":"Feeling fine — betting on its read of the cue.";
+    else if(mood>=-1) msg="Feeling okay — willing to bet when the cue looks good.";
+    else if(mood>=-2.5) msg="Getting low — hesitating, betting less than it wants to.";
+    else msg="Too sad to keep playing — mostly sitting out to protect itself.";
+    $("#mood-explain").textContent=msg;
+    $("#p-base").style.width=Math.round(100*frame.pBase)+"%"; $("#p-base-n").textContent=Math.round(100*frame.pBase)+"%";
+    $("#p-act").style.width=Math.round(100*frame.pAct)+"%"; $("#p-act-n").textContent=Math.round(100*frame.pAct)+"%";
+    drawBrain();
+    drawSeries("c-bank",bankHist,{ymin:0,ymax:Math.max(TARGET,peak)*1.05,color:COL.gold,fill:"rgba(245,196,81,.08)",
+      guides:[{v:TARGET,label:"$"+TARGET,color:COL.gold},{v:0,label:"$0",color:COL.pain}]});
+    drawSeries("c-mood",moodHist,{ymin:-4,ymax:1,color:COL.mood,guides:[{v:0,label:"0",color:COL.dopa}]});
+  }
+
+  let playing=true,last=0,acc=0;
+  function tick(ts){ const rps=+$("#speed").value; const dt=Math.min(0.1,(ts-last)/1000); last=ts;
+    if(playing){ acc+=dt*rps; let s=0; while(acc>=1&&s<200){step();acc-=1;s++;} } render(); requestAnimationFrame(tick); }
+
+  $("#book-seg").addEventListener("click",e=>{const b=e.target.closest("button"); if(!b)return;
+    book=b.dataset.book; for(const x of $("#book-seg").children)x.setAttribute("aria-pressed",x===b); newTheta(); newLife();});
+  $("#temp-seg").addEventListener("click",e=>{const b=e.target.closest("button"); if(!b)return;
+    temp=b.dataset.temp; for(const x of $("#temp-seg").children)x.setAttribute("aria-pressed",x===b); newLife();});
+  $("#play").onclick=()=>{ playing=!playing; $("#play").textContent=playing?"⏸ Pause":"▶ Play"; };
+  $("#speed").oninput=()=>{ $("#rps-label").textContent=$("#speed").value+" rounds/s"; };
+  $("#reset-hist").onclick=()=>{ lives=[]; saveLives(); renderHistory(); };
+  addEventListener("resize",()=>{ kcPts=null; });
+
+  loadLives(); renderHistory();
+  if(reduce){ playing=false; $("#play").textContent="▶ Play"; }
+  render();
+  requestAnimationFrame(t=>{ last=t; requestAnimationFrame(tick); });
+})();
+</script>
