@@ -41,6 +41,8 @@
   .panel{background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--hair); border-radius:14px; padding:16px}
   .panel h2{margin:0 0 10px; font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
   #brain{width:100%; height:auto; display:block; border-radius:8px}
+  .stage{margin-top:14px}
+  #fly{width:100%; height:auto; display:block; border-radius:8px; background:radial-gradient(120% 140% at 50% 120%, rgba(74,163,255,.05), transparent 60%)}
 
   .bank{display:flex; align-items:baseline; gap:10px}
   .bank .amt{font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:clamp(32px,6vw,50px); line-height:1; letter-spacing:-.02em}
@@ -129,6 +131,11 @@
     </div>
   </div>
 
+  <section class="panel stage">
+    <h2>The fly · <span id="stage-sub" style="color:var(--muted)">alive</span></h2>
+    <canvas id="fly" width="900" height="150" aria-label="The fly, animated"></canvas>
+  </section>
+
   <div class="grid">
     <section class="panel">
       <h2>The brain · mushroom body</h2>
@@ -215,7 +222,7 @@
   const COL = {dopa:css("--dopa"),pain:css("--pain"),kc:css("--kc"),gold:css("--gold"),mood:css("--mood"),
     ink:css("--ink"),muted:css("--muted"),hair:css("--hair"),faint:css("--faint"),panel:css("--panel-2")};
 
-  const N=16, ACTIVE=6, ODDS=2.0, STAKE=1, START=25, TARGET=100;
+  const N=16, ACTIVE=6, ODDS=2.0, STAKE=3, START=25, TARGET=100;  // stake>1 => shorter, watchable lives (fair odds unchanged)
   const TEMPS = {
     chaser:     {mood_gain:0.15, mood_recovery:0.99,  withdrawal:0.0},
     withdrawer: {mood_gain:0.5,  mood_recovery:0.999, withdrawal:10.0},
@@ -234,6 +241,21 @@
 
   let v, value, mood, Dref, Dscale, bankroll, peak, roundNo, betsLife, winsLife, lifeNo=1;
   let bankHist=[], moodHist=[], lives=[];
+
+  // --- animation state ---
+  let NOW=0, activity=0, fireT=-9999, danT=-9999, danSign=0;
+  let phase="alive", phaseStart=0, deathOutcome=null;
+  const DEATH_MS=1600, BIRTH_MS=1100;
+  const fly={x:0.5,y:0.52,tx:0.5,ty:0.5,reactT:-9999,reactType:null};
+  let parts=[];  // {x,y,vx,vy,age,life,color,r} in stage fractional coords
+  function spawnParts(x,y,color,n,spd){ for(let i=0;i<n;i++){ const a=Math.random()*6.283, s=spd*(0.3+Math.random());
+      parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-0.2,age:0,life:0.6+Math.random()*0.7,color,r:1.4+Math.random()*2.6}); }
+    if(parts.length>260)parts=parts.slice(-260); }
+  function reactFly(type){ fly.reactType=type; fly.reactT=NOW; spawnParts(fly.x,fly.y,type==="win"?COL.dopa:COL.pain,8,0.55); }
+  function startDeath(outcome){ deathOutcome=outcome; phase="dying"; phaseStart=NOW;
+    spawnParts(fly.x,fly.y, outcome==="rich"?COL.gold:COL.pain, 26, 0.9); }
+  function startBirth(){ lifeNo++; newLife(); if(book==="learnable")newTheta(); phase="newborn"; phaseStart=NOW;
+    fly.x=0.5; fly.y=0.52; fly.reactT=-9999; spawnParts(0.5,0.52,COL.dopa,22,0.7); }
 
   function pwin(cue){
     if(book==="fair") return 1/ODDS;   // truly random: 50/50 at even odds, zero edge either way
@@ -279,11 +301,16 @@
     bankHist.push(bankroll); if(bankHist.length>400)bankHist.shift();
     moodHist.push(mood); if(moodHist.length>400)moodHist.shift();
     frame={cue,action:bet?"bet":"pass",won,delta,pBase,pAct,drive:D};
+    fireT=NOW; activity=1;
+    if(won===true){ danT=NOW; danSign=1; reactFly("win"); }
+    else if(won===false){ danT=NOW; danSign=-1; reactFly("loss"); }
 
     if(bankroll<STAKE || bankroll>=TARGET){
-      recordLife(bankroll>=TARGET?"rich":"ruin");
-      lifeNo++; newLife(); if(book==="learnable")newTheta();
+      const outcome = bankroll>=TARGET?"rich":"ruin";
+      recordLife(outcome); startDeath(outcome);
+      return true;   // life ended -> play the death/rebirth animation
     }
+    return false;
   }
 
   const LS_KEY="flygambler_lives_v1";
@@ -320,21 +347,91 @@
   function drawBrain(){
     const cv=$("#brain"); const {ctx,w,h}=fit(cv,Math.max(280,cv.clientWidth*.52)); ctx.clearRect(0,0,w,h);
     const {pts}=brainLayout(w,h);
+    const alpnX=w*.10, mbonX=w*.78;
     ctx.font="10px 'IBM Plex Mono',monospace"; ctx.textAlign="center"; ctx.fillStyle=COL.muted;
-    ctx.fillText("ALPN",w*.10,h*.07); ctx.fillText("KENYON CELLS (sparse code)",w*.48,h*.07); ctx.fillText("MBON",w*.78,h*.07);
-    for(let i=0;i<8;i++){const y=h*(.16+.68*i/7); ctx.beginPath(); ctx.arc(w*.10,y,3,0,7); ctx.fillStyle=COL.faint; ctx.fill();}
+    ctx.fillText("ALPN",alpnX,h*.07); ctx.fillText("KENYON CELLS (sparse code)",w*.48,h*.07); ctx.fillText("MBON",mbonX,h*.07);
+    // a spike wave sweeps ALPN -> MBON; brightness scales with recent firing (activity)
+    const sweep=reduce?0.5:(NOW/320)%1, sx=alpnX+(mbonX-alpnX)*sweep, act=Math.max(0.12,activity);
+    ctx.save(); ctx.globalAlpha=0.10*act+0.03; ctx.fillStyle=COL.kc; ctx.fillRect(sx-3,h*.10,6,h*.82); ctx.restore();
+    // ALPN inputs, pulse as the wave leaves them
+    for(let i=0;i<8;i++){const y=h*(.16+.68*i/7), lit=sweep<0.14; ctx.beginPath(); ctx.arc(alpnX,y,3,0,7);
+      ctx.fillStyle=lit?COL.kc:COL.faint; if(lit){ctx.shadowColor=COL.kc;ctx.shadowBlur=8;} ctx.fill(); ctx.shadowBlur=0;}
+    // Kenyon cells: active (per-round) dots flash bright as the wave passes them
     const r=mulberry32(1000+roundNo*7+(frame.cue[0]||0)*131+(frame.cue[3]||0));
     for(let i=0;i<pts.length;i++){ const on=r()<0.16, p=pts[i];
-      ctx.beginPath(); ctx.arc(p[0],p[1],on?2.6:1.5,0,7);
-      if(on){ctx.shadowColor=COL.kc;ctx.shadowBlur=6;ctx.fillStyle=COL.kc;}else{ctx.shadowBlur=0;ctx.fillStyle=COL.faint;} ctx.fill(); }
-    ctx.shadowBlur=0;
-    const betting=frame.action==="bet";
+      const flash = on ? Math.max(0,1-Math.abs(p[0]-sx)/(w*0.06))*act : 0;
+      ctx.beginPath(); ctx.arc(p[0],p[1], on?(2.3+flash*2.4):1.4, 0,7);
+      if(on){ ctx.shadowColor=COL.kc; ctx.shadowBlur=4+flash*11; ctx.fillStyle=COL.kc; ctx.globalAlpha=0.5+0.5*flash; }
+      else { ctx.shadowBlur=0; ctx.fillStyle=COL.faint; ctx.globalAlpha=1; }
+      ctx.fill(); }
+    ctx.globalAlpha=1; ctx.shadowBlur=0;
+    // MBON go/no bars, pulse as the wave arrives
+    const betting=frame.action==="bet", arr=sweep>0.9?act:0;
     const a=Math.max(.05,Math.min(1,(frame.drive-Dref)/(3*Dscale)+.5));
-    bar(ctx,w*.78-16,h*.16,12,h*.66,a,COL.dopa,betting);
-    bar(ctx,w*.78+4, h*.16,12,h*.66,1-a,COL.pain,!betting);
-    ctx.fillStyle=COL.faint; ctx.font="9px 'IBM Plex Mono',monospace"; ctx.fillText("go",w*.78-10,h*.9+13); ctx.fillText("no",w*.78+10,h*.9+13);
+    bar(ctx,mbonX-16,h*.16,12,h*.66,a,COL.dopa,betting||arr>0.3);
+    bar(ctx,mbonX+4, h*.16,12,h*.66,1-a,COL.pain,!betting||arr>0.3);
+    ctx.fillStyle=COL.faint; ctx.font="9px 'IBM Plex Mono',monospace"; ctx.fillText("go",mbonX-10,h*.9+13); ctx.fillText("no",mbonX+10,h*.9+13);
+    // dopamine (PAM) / pain (PPL1) nodes + a burst ring on the latest outcome
     node(ctx,w*.90,h*.30,"PAM",COL.dopa,frame.won===true?1:0.12);
     node(ctx,w*.90,h*.66,"PPL1",COL.pain,frame.won===false?1:0.12);
+    const dage=NOW-danT;
+    if(dage<520 && danSign){ const ny=danSign>0?h*.30:h*.66, col=danSign>0?COL.dopa:COL.pain, q=dage/520;
+      ctx.save(); ctx.globalAlpha=(1-q)*0.85; ctx.strokeStyle=col; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(w*.90,ny,12+q*28,0,7); ctx.stroke(); ctx.restore(); }
+  }
+
+  function drawFly(ctx,x,y,s,wing,tint,eyes,alpha){
+    ctx.save(); ctx.translate(x,y); ctx.scale(s,s); ctx.globalAlpha=alpha;
+    // wings
+    ctx.save(); ctx.globalAlpha=alpha*0.45; ctx.fillStyle="#e6eeff";
+    for(const sgn of [-1,1]){ ctx.save(); ctx.rotate(sgn*(0.5+wing)); ctx.beginPath(); ctx.ellipse(0,-12,7,15,0,0,7); ctx.fill(); ctx.restore(); }
+    ctx.restore();
+    // body (with glow tinted by mood/outcome)
+    ctx.shadowColor=tint; ctx.shadowBlur=16; ctx.fillStyle="#212b3d";
+    ctx.beginPath(); ctx.ellipse(0,5,11,15,0,0,7); ctx.fill(); ctx.shadowBlur=0;
+    ctx.strokeStyle="#33405a"; ctx.lineWidth=1.6; for(const yy of [2,7,12]){ ctx.beginPath(); ctx.moveTo(-9,yy); ctx.lineTo(9,yy); ctx.stroke(); }
+    // head
+    ctx.fillStyle="#2b3650"; ctx.beginPath(); ctx.arc(0,-11,8,0,7); ctx.fill();
+    // eyes
+    const ex=4;
+    if(eyes==="x"){ ctx.strokeStyle=COL.pain; ctx.lineWidth=1.6;
+      for(const sgn of [-1,1]){ const cx=sgn*ex; ctx.beginPath(); ctx.moveTo(cx-2,-13); ctx.lineTo(cx+2,-9); ctx.moveTo(cx+2,-13); ctx.lineTo(cx-2,-9); ctx.stroke(); } }
+    else { ctx.fillStyle="#ff5a6e"; for(const sgn of [-1,1]){ ctx.beginPath(); ctx.arc(sgn*ex,-12,3.4,0,7); ctx.fill(); }
+      ctx.fillStyle="#fff"; for(const sgn of [-1,1]){ ctx.beginPath(); ctx.arc(sgn*ex+0.7,-13, eyes==="sad"?0.8:1.2,0,7); ctx.fill(); } }
+    ctx.restore();
+  }
+
+  function drawFlyStage(){
+    const cv=$("#fly"); if(!cv) return; const {ctx,w,h}=fit(cv,150); ctx.clearRect(0,0,w,h);
+    let fx=fly.x*w, fy=fly.y*h, s=h/108, alpha=1, tint=COL.mood, eyes="normal",
+        wing=reduce?0:Math.sin(NOW/34)*0.55, label="", labelCol=COL.muted;
+    if(phase==="dying"){
+      const p=Math.min(1,(NOW-phaseStart)/DEATH_MS);
+      if(deathOutcome==="ruin"){ fy=(fly.y+1.5*p*p)*h; alpha=1-0.8*p; eyes="x"; tint=COL.pain; wing=Math.max(0,0.35-p); s*=1-0.12*p;
+        label="💀  life #"+lifeNo+" went broke"; labelCol=COL.pain; }
+      else { fy=(fly.y-1.1*p)*h; alpha=1-0.7*p; tint=COL.gold; wing=Math.sin(NOW/22)*0.7; s*=1+0.35*p;
+        label="🤑  life #"+lifeNo+" cashed out RICH"; labelCol=COL.gold; }
+    } else if(phase==="newborn"){
+      const p=Math.min(1,(NOW-phaseStart)/BIRTH_MS); fx=0.5*w; fy=0.52*h; s*=Math.min(1,p*1.5); alpha=Math.min(1,p*1.8); tint=COL.dopa;
+      ctx.save(); ctx.globalAlpha=(1-p)*0.7; ctx.strokeStyle=COL.dopa; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(fx,fy,10+p*42,0,7); ctx.stroke(); ctx.restore();
+      label="✨  life #"+lifeNo+" is born"; labelCol=COL.dopa;
+    } else {
+      tint = mood>=0.4?COL.dopa : mood<=-2?COL.pain : COL.mood;
+      eyes = mood<=-2?"sad":"normal"; wing=reduce?0:Math.sin(NOW/(mood<=-2?70:34))*(mood<=-2?0.3:0.55);
+      const since=NOW-fly.reactT;
+      if(since<420){ const q=1-since/420; if(fly.reactType==="win") fy-=22*Math.sin(q*Math.PI)*q; else fx+=Math.sin(since/25)*6*q; }
+    }
+    // ground shadow
+    ctx.save(); ctx.globalAlpha=0.22*alpha; ctx.fillStyle="#000"; ctx.beginPath(); ctx.ellipse(fx,h*0.9,16*s,4*s,0,0,7); ctx.fill(); ctx.restore();
+    // particles
+    for(const pt of parts){ const q=1-pt.age/pt.life; ctx.globalAlpha=Math.max(0,q); ctx.fillStyle=pt.color;
+      ctx.beginPath(); ctx.arc(pt.x*w,pt.y*h,pt.r*q+0.5,0,7); ctx.fill(); }
+    ctx.globalAlpha=1;
+    drawFly(ctx,fx,fy,s,wing,tint,eyes,alpha);
+    if(label){ ctx.globalAlpha=1; ctx.fillStyle=labelCol; ctx.font="600 14px 'IBM Plex Mono',monospace"; ctx.textAlign="center"; ctx.fillText(label,w/2,h*0.17); }
+    const sub=$("#stage-sub"); if(sub){
+      sub.textContent = phase==="dying"?(deathOutcome==="rich"?"cashing out…":"dying…") : phase==="newborn"?"newborn" : "alive · "+MOODW(mood);
+      sub.style.color = phase==="dying"?(deathOutcome==="rich"?COL.gold:COL.pain) : phase==="newborn"?COL.dopa : COL.muted; }
   }
   function drawSeries(id,data,opts){ const cv=$("#"+id); const {ctx,w,h}=fit(cv,160); ctx.clearRect(0,0,w,h);
     const padL=42,padR=10,padT=12,padB=16,iw=w-padL-padR,ih=h-padT-padB,n=Math.max(2,data.length);
@@ -378,6 +475,7 @@
     $("#mood-explain").textContent=msg;
     $("#p-base").style.width=Math.round(100*frame.pBase)+"%"; $("#p-base-n").textContent=Math.round(100*frame.pBase)+"%";
     $("#p-act").style.width=Math.round(100*frame.pAct)+"%"; $("#p-act-n").textContent=Math.round(100*frame.pAct)+"%";
+    drawFlyStage();
     drawBrain();
     drawSeries("c-bank",bankHist,{ymin:0,ymax:Math.max(TARGET,peak)*1.05,color:COL.gold,fill:"rgba(245,196,81,.08)",
       guides:[{v:TARGET,label:"$"+TARGET,color:COL.gold},{v:0,label:"$0",color:COL.pain}]});
@@ -385,8 +483,19 @@
   }
 
   let playing=true,last=0,acc=0;
-  function tick(ts){ const rps=+$("#speed").value; const dt=Math.min(0.1,(ts-last)/1000); last=ts;
-    if(playing){ acc+=dt*rps; let s=0; while(acc>=1&&s<200){step();acc-=1;s++;} } render(); requestAnimationFrame(tick); }
+  function tick(ts){ NOW=ts; const dt=Math.min(0.05,(ts-last)/1000); last=ts;
+    activity*=0.94;
+    if(phase==="alive" && playing){ const rps=+$("#speed").value; acc+=dt*rps; let s=0;
+      while(acc>=1 && s<200){ acc-=1; s++; if(step()) break; } }
+    else if(phase==="dying" && NOW-phaseStart>=DEATH_MS){ startBirth(); }
+    else if(phase==="newborn" && NOW-phaseStart>=BIRTH_MS){ phase="alive"; }
+    // particles
+    for(const p of parts){ p.age+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=1.1*dt; }
+    if(parts.length) parts=parts.filter(p=>p.age<p.life);
+    // idle wander for the living fly
+    if(phase==="alive"){ if(Math.random()<0.02){ fly.tx=0.34+Math.random()*0.32; fly.ty=0.4+Math.random()*0.26; }
+      fly.x+=(fly.tx-fly.x)*Math.min(1,dt*1.6); fly.y+=(fly.ty-fly.y)*Math.min(1,dt*1.6); }
+    render(); requestAnimationFrame(tick); }
 
   $("#book-seg").addEventListener("click",e=>{const b=e.target.closest("button"); if(!b)return;
     book=b.dataset.book; for(const x of $("#book-seg").children)x.setAttribute("aria-pressed",x===b); newTheta(); newLife();});
