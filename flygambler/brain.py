@@ -68,9 +68,9 @@ class BrainConfig:
     # mood / despair — a SLOW internal state that builds with sustained loss and,
     # when `withdrawal` > 0, suppresses betting (learned-helplessness / "too sad
     # to keep playing"). Defaults leave behaviour unchanged (withdrawal = 0).
-    mood_gain: float = 0.15             # how much each loss deepens sadness
+    mood_gain: float = 0.15             # how strongly each outcome moves mood
     mood_recovery: float = 0.99         # per-round drift of mood back toward neutral (slow => persistent)
-    win_mood_factor: float = 0.4        # wins lift mood less than losses lower it (loss aversion)
+    win_mood_factor: float = 0.9        # wins lift mood nearly as much as losses lower it (mild loss-aversion)
     withdrawal: float = 0.0             # how strongly low mood suppresses betting (0 => off)
     # engine
     dt_ms: float = 0.5
@@ -247,9 +247,10 @@ class FlyBrain:
 
         rpe = reward - self.value
         self.value += self.cfg.value_lr * rpe
-        # mood deepens with losses (and lifts a little with wins -- loss aversion)
-        self.mood += self.cfg.mood_gain * (rpe if rpe < 0 else self.cfg.win_mood_factor * rpe)
-        self.mood = float(np.clip(self.mood, -4.0, 1.0))
+        # mood follows ACTUAL fortune: up when it wins money, down when it loses
+        # (uses the round reward, not prediction error, so a winning fly is happy)
+        self.mood += self.cfg.mood_gain * (reward if reward < 0 else self.cfg.win_mood_factor * reward)
+        self.mood = float(np.clip(self.mood, -4.0, 3.0))
         valence = "reward" if rpe >= 0 else "punish"
         pam_spk, ppl1_spk = self._deliver_dopamine(valence, abs(rpe))
 
