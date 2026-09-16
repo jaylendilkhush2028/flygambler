@@ -34,7 +34,7 @@ TEMPERAMENTS = {
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--book", default="rigged", choices=["rigged", "learnable"])
+    ap.add_argument("--book", default="fair", choices=["fair", "rigged", "learnable"])
     ap.add_argument("--temperament", default="chaser", choices=["chaser", "withdrawer"])
     ap.add_argument("--bankroll", type=float, default=25.0)
     ap.add_argument("--target", type=float, default=100.0)

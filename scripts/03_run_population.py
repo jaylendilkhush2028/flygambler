@@ -26,7 +26,7 @@ from flygambler.plots import plot_population
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--book", default="rigged", choices=["learnable", "rigged"])
+    ap.add_argument("--book", default="fair", choices=["fair", "learnable", "rigged"])
     ap.add_argument("--n", type=int, default=60, help="number of flies")
     ap.add_argument("--rounds", type=int, default=1500)
     ap.add_argument("--bankroll", type=float, default=25.0)

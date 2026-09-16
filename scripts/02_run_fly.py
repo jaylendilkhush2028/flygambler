@@ -25,7 +25,7 @@ from flygambler.plots import plot_life
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--book", default="learnable", choices=["learnable", "rigged"])
+    ap.add_argument("--book", default="learnable", choices=["fair", "learnable", "rigged"])
     ap.add_argument("--rounds", type=int, default=1500)
     ap.add_argument("--bankroll", type=float, default=25.0)
     ap.add_argument("--target", type=float, default=100.0)

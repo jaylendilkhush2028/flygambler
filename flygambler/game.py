@@ -80,6 +80,18 @@ class Sportsbook:
         return -float(np.mean([self.ev(c) for c in cues]))
 
 
+class FairBook(Sportsbook):
+    """A truly fair game: 50/50 at even odds, zero edge either way.
+
+    The cue is irrelevant and there is no house take, so bankroll is a pure
+    (driftless) random walk -- the fly's fate is luck plus its own behaviour.
+    Gambler's ruin: from $b toward target $T with $0 ruin, P(reach T) = b / T.
+    """
+
+    def p_win(self, cue: np.ndarray) -> float:
+        return 1.0 / self.odds
+
+
 class RiggedBook(Sportsbook):
     """Pure chance with a house edge; the cue is irrelevant. Optimal: never bet."""
 
@@ -128,6 +140,8 @@ class LearnableBook(Sportsbook):
 
 def make_book(kind: str, **kwargs) -> Sportsbook:
     kind = kind.lower()
+    if kind in ("fair", "random", "coin"):
+        return FairBook(**kwargs)
     if kind in ("rigged", "house", "casino"):
         return RiggedBook(**kwargs)
     if kind in ("learnable", "beatable", "edge"):

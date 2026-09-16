@@ -117,7 +117,7 @@
   <div class="controls">
     <div class="ctl"><span class="lbl">Game</span>
       <div class="seg" id="book-seg" role="group" aria-label="Game type">
-        <button data-book="rigged" aria-pressed="true">Rigged (house edge)</button>
+        <button data-book="fair" aria-pressed="true">Random (fair 50/50)</button>
         <button data-book="learnable" aria-pressed="false">Beatable (has edge)</button>
       </div>
     </div>
@@ -225,7 +225,7 @@
   function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
   const rng = Math.random;
 
-  let book="rigged", temp="chaser";
+  let book="fair", temp="chaser";
   let theta=[], bias=0;
   function newTheta(){ theta=[]; for(let i=0;i<N;i++)theta[i]=rng()*2-1;
     const nrm=Math.hypot.apply(null,theta)||1; for(let i=0;i<N;i++)theta[i]/=nrm;
@@ -236,7 +236,7 @@
   let bankHist=[], moodHist=[], lives=[];
 
   function pwin(cue){
-    if(book==="rigged") return (1/ODDS)-0.06;
+    if(book==="fair") return 1/ODDS;   // truly random: 50/50 at even odds, zero edge either way
     let s=0; for(const c of cue) s+=theta[c]; s-=bias;
     return 0.12+0.76*(1/(1+Math.exp(-4*s)));
   }
@@ -299,7 +299,7 @@
     lives.slice(-12).reverse().forEach(l=>{ const d=document.createElement("div"); d.className="life";
       d.innerHTML='<span class="muted">#'+l.n+'</span>'+
         '<span class="oc '+l.outcome+'">'+(l.outcome==="ruin"?"BROKE":"RICH")+'</span>'+
-        '<span class="muted">'+l.temp+' · '+(l.book==="rigged"?"rigged":"beatable")+' · '+l.rounds+' rounds</span>'+
+        '<span class="muted">'+l.temp+' · '+(l.book==="learnable"?"beatable":"fair")+' · '+l.rounds+' rounds</span>'+
         '<span>peak $'+l.peak+'</span>'; box.appendChild(d); });
   }
 
