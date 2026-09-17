@@ -37,11 +37,12 @@ disengages, and stops — the sadness is *protective*.
 
 ![Chase vs. withdraw](assets/temperaments.png)
 
-**What reduces the harm?** Across random-fly populations on the rigged game, the
-innate pain fires in every condition, but the *path to ruin is learned*: **blocking
-win-driven reinforcement takes ruin ~40% → 0% and cuts pain ~80%**, while simply
-adding "self-control" doesn't help. The harm is a learned reinforcement loop —
-breaking that loop beats willpower.
+**What reduces the harm?** Across random-fly populations on the rigged game
+(n = 40 flies/condition, 95% CIs), the innate pain fires in every condition, but
+the *path to ruin is learned*: **blocking win-driven reinforcement takes ruin
+~32% → 0% and cuts pain ~80%**, while simply adding "self-control" (a higher
+betting threshold) doesn't help — if anything it's a touch worse. The harm is a
+learned reinforcement loop, and breaking that loop beats willpower.
 
 ![Interventions](assets/interventions.png)
 
