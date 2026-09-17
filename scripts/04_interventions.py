@@ -92,6 +92,7 @@ def main():
             "rich_rate": sum(f == RICH for f in fates) / len(fates),
             "median_survival": st.median(rounds_),
             "mean_pain": st.mean(pain),
+            "pain_sem": (st.stdev(pain) / (len(pain) ** 0.5)) if len(pain) > 1 else 0.0,
             "mean_final": st.mean(final),
             "n": args.n,
         }

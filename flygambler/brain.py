@@ -47,7 +47,7 @@ class BrainConfig:
     # decision
     temperature: float = 0.7            # softness of the bet decision
     explore_eps: float = 0.05           # exploration floor on P(bet)
-    adapt_ref: float = 0.01             # slow drift of the reference (removes global weight inflation)
+    adapt_ref: float = 0.01             # slow drift of the decision reference
     bet_bias: float = 0.0               # >0 => more cautious (self-control intervention)
     # dopamine / teaching
     simulate_dopamine: bool = True      # actually fire PAM/PPL1 so dopamine/pain are real spikes
@@ -152,8 +152,8 @@ class FlyBrain:
         self.mood = 0.0          # slow despair state (negative = sad); see BrainConfig
         self.n_rounds = 0
 
-        self.D_ref0, self.D_scale = self._calibrate(n=40, verbose=verbose)
-        self.D_ref = self.D_ref0
+        self.D_ref0, self.D_scale0 = self._calibrate(n=40, verbose=verbose)
+        self.D_ref, self.D_scale = self.D_ref0, self.D_scale0
 
     def _random_cue(self) -> np.ndarray:
         """A sparse cue matching the book's structure (for calibration)."""
@@ -166,8 +166,8 @@ class FlyBrain:
         """Set the naive bet-drive reference from a sample of representative cues."""
         drives = np.array([self._run_cue(c)[4] for c in cues])
         self.D_ref0 = float(drives.mean())
-        self.D_scale = float(drives.std() + 1e-6)
-        self.D_ref = self.D_ref0
+        self.D_scale0 = float(drives.std() + 1e-6)
+        self.D_ref, self.D_scale = self.D_ref0, self.D_scale0
 
     def reset(self, seed: int | None = None) -> None:
         """Restore naive state (fresh weights, critic, hedonic) for a new fly."""
@@ -179,7 +179,7 @@ class FlyBrain:
         self.hedonic = 0.0
         self.mood = 0.0
         self.n_rounds = 0
-        self.D_ref = self.D_ref0
+        self.D_ref, self.D_scale = self.D_ref0, self.D_scale0
 
     # ----------------------------------------------------------------- helpers
     def encode(self, cue: np.ndarray) -> None:
@@ -222,14 +222,19 @@ class FlyBrain:
     # ---------------------------------------------------------------- main API
     def decide(self, cue: np.ndarray) -> tuple[Decision, dict]:
         delta, kc_c, mbon_c, alpn_c, drive = self._run_cue(cue)
-        if self.cfg.adapt_ref > 0:
-            self.D_ref += self.cfg.adapt_ref * (drive - self.D_ref)
         z = (drive - self.D_ref) / (self.cfg.temperature * self.D_scale) - self.cfg.bet_bias
-        # sustained sadness suppresses betting ("too sad to keep playing")
-        z -= self.cfg.withdrawal * max(0.0, -self.mood)
         p = 1.0 / (1.0 + np.exp(-np.clip(z, -30.0, 30.0)))
         eps = self.cfg.explore_eps
         p_bet = eps + (1.0 - 2.0 * eps) * p
+        # Sustained sadness gates betting toward the exploration floor -- applied
+        # multiplicatively on P(bet) so it works regardless of the drive's scale
+        # (a raw z-penalty gets swamped once learning drifts the drive).
+        if self.cfg.withdrawal > 0:
+            sad = max(0.0, -self.mood)
+            gate = 1.0 / (1.0 + np.exp(np.clip(self.cfg.withdrawal * (sad - 2.0), -30.0, 30.0)))
+            p_bet = eps + (p_bet - eps) * gate
+        if self.cfg.adapt_ref > 0:
+            self.D_ref += self.cfg.adapt_ref * (drive - self.D_ref)
         action = "bet" if self.rng.random() < p_bet else "pass"
         dec = Decision(
             action=action, p_bet=float(p_bet), drive=drive,

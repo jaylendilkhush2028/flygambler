@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flygambler"
+version = "0.1.0"
+description = "A real fruit-fly connectome (FlyWire mushroom body) that learns to gamble via dopamine"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "jaylendilkhush2028" }]
+keywords = ["connectome", "drosophila", "flywire", "mushroom-body", "reinforcement-learning", "neuroscience"]
+dependencies = [
+    "brian2>=2.7",
+    "numpy",
+    "scipy",
+    "pandas",
+    "pyarrow",
+    "matplotlib",
+    "rich",
+    "setuptools",  # Brian2 needs the distutils shim on Python 3.12+
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.urls]
+Homepage = "https://github.com/jaylendilkhush2028/flygambler"
+
+[project.scripts]
+flygambler-fetch-data = "flygambler.data_fetch:main"
+
+[tool.setuptools]
+packages = ["flygambler"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -41,6 +41,17 @@
   .panel{background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--hair); border-radius:14px; padding:16px}
   .panel h2{margin:0 0 10px; font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
   #brain{width:100%; height:auto; display:block; border-radius:8px}
+  .lab{margin-top:14px}
+  .lab summary{cursor:pointer; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); list-style:none}
+  .lab summary::-webkit-details-marker{display:none}
+  .lab[open] summary{margin-bottom:12px; color:var(--kc)}
+  .lab-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px 24px}
+  @media (max-width:640px){ .lab-grid{grid-template-columns:1fr} }
+  .lab-grid label{display:flex; align-items:center; gap:10px; font-size:12px; color:var(--muted); white-space:nowrap}
+  .lab-grid label input[type=range]{flex:1; min-width:60px}
+  .lab-grid label span{min-width:74px; text-align:right; color:var(--ink)}
+  .lab button.sm{margin-top:12px; font-size:12px; padding:6px 12px; border:1px solid var(--hair); background:var(--panel-2); color:var(--ink); border-radius:8px; cursor:pointer; font-family:inherit}
+  .lab button.sm:hover{border-color:var(--kc)}
   .stage{margin-top:14px}
   #fly{width:100%; height:auto; display:block; border-radius:8px; background:radial-gradient(120% 140% at 50% 120%, rgba(74,163,255,.05), transparent 60%)}
 
@@ -131,6 +142,17 @@
     </div>
   </div>
 
+  <details class="panel lab" id="lab">
+    <summary>⚙ Lab — tune the fly (advanced)</summary>
+    <div class="lab-grid">
+      <label>Learning rate <input type="range" id="s-lr" min="0" max="0.3" step="0.01" value="0.09"><span class="mono" id="lr-v">0.09</span></label>
+      <label>Stake / bet <input type="range" id="s-stake" min="1" max="10" step="1" value="3"><span class="mono" id="stake-v">$3</span></label>
+      <label>Goal (get rich) <input type="range" id="s-target" min="40" max="200" step="10" value="100"><span class="mono" id="target-v">$100</span></label>
+      <label>Give-up tendency <input type="range" id="s-wd" min="0" max="14" step="1" value="0"><span class="mono" id="wd-v">preset (0)</span></label>
+    </div>
+    <button id="lab-reset" class="sm">Reset to defaults</button>
+  </details>
+
   <section class="panel stage">
     <h2>The fly · <span id="stage-sub" style="color:var(--muted)">alive</span></h2>
     <canvas id="fly" width="900" height="150" aria-label="The fly, animated"></canvas>
@@ -146,7 +168,7 @@
       <h2>The terminal</h2>
       <div class="bank"><div class="amt" id="bankroll">$25</div><div class="delta mono flat" id="delta">—</div></div>
       <div class="gauge"><div class="fill" id="gauge-fill"></div></div>
-      <div class="gauge-labels"><span>$0 · ruin → reborn</span><span>$100 · rich → reborn</span></div>
+      <div class="gauge-labels"><span>$0 · ruin → reborn</span><span id="rich-label">$100 · rich → reborn</span></div>
       <div class="slip">
         <div class="slip-row"><span class="k">Decision</span><span class="decision pass" id="decision">—</span></div>
         <div class="slip-row"><span class="k">Cue</span><span class="cue-chips" id="cue"></span></div>
@@ -222,12 +244,14 @@
   const COL = {dopa:css("--dopa"),pain:css("--pain"),kc:css("--kc"),gold:css("--gold"),mood:css("--mood"),
     ink:css("--ink"),muted:css("--muted"),hair:css("--hair"),faint:css("--faint"),panel:css("--panel-2")};
 
-  const N=16, ACTIVE=6, ODDS=2.0, STAKE=3, START=25, TARGET=100;  // stake>1 => shorter, watchable lives (fair odds unchanged)
+  const N=16, ACTIVE=6, ODDS=2.0, START=25;
+  let stake=3, target=100, learnRate=0.09, withdrawUser=null;   // live-tunable in the Lab
   const TEMPS = {
     chaser:     {mood_gain:0.15, mood_recovery:0.99,  withdrawal:0.0},
     withdrawer: {mood_gain:0.5,  mood_recovery:0.999, withdrawal:10.0},
   };
-  const LR=0.09, VALUE_LR=0.05, TEMP=0.7, EPS=0.05, REF_LR=0.02, WIN_MOOD=0.9;
+  const VALUE_LR=0.05, TEMP=0.7, EPS=0.05, REF_LR=0.02, WIN_MOOD=0.9;
+  const effWithdrawal = () => withdrawUser!=null ? withdrawUser : TEMPS[temp].withdrawal;
 
   function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
   const rng = Math.random;
@@ -278,7 +302,7 @@
     const clamp=x=>Math.max(-30,Math.min(30,x)), sig=x=>1/(1+Math.exp(-clamp(x)));
     const zBase=(D-Dref)/(TEMP*Dscale);
     const sad=Math.max(0,-mood);
-    const zAct=zBase - TEMPS[temp].withdrawal*sad;
+    const zAct=zBase - effWithdrawal()*sad;
     const pBase=EPS+(1-2*EPS)*sig(zBase);
     const pAct =EPS+(1-2*EPS)*sig(zAct);
     Dref += REF_LR*(D-Dref);
@@ -290,9 +314,9 @@
     if(bet){
       const p=pwin(cue); won=rng()<p;
       const reward=won?(ODDS-1):-1;
-      delta=STAKE*reward; bankroll+=delta; betsLife++; if(won)winsLife++;
+      delta=stake*reward; bankroll+=delta; betsLife++; if(won)winsLife++;
       const rpe=reward-value; value+=VALUE_LR*rpe;
-      for(const c of cue) v[c]+=LR*rpe;
+      for(const c of cue) v[c]+=learnRate*rpe;
       const g=TEMPS[temp].mood_gain;
       // mood follows actual fortune: up when it WINS, down when it loses
       mood += g*(reward<0?reward:WIN_MOOD*reward); mood=Math.max(-4,Math.min(3,mood));
@@ -305,8 +329,8 @@
     if(won===true){ danT=NOW; danSign=1; reactFly("win"); }
     else if(won===false){ danT=NOW; danSign=-1; reactFly("loss"); }
 
-    if(bankroll<STAKE || bankroll>=TARGET){
-      const outcome = bankroll>=TARGET?"rich":"ruin";
+    if(bankroll<stake || bankroll>=target){
+      const outcome = bankroll>=target?"rich":"ruin";
       recordLife(outcome); startDeath(outcome);
       return true;   // life ended -> play the death/rebirth animation
     }
@@ -449,8 +473,8 @@
     $("#bankroll").textContent="$"+Math.round(bankroll);
     const d=frame.delta, de=$("#delta"); de.className="delta mono "+(d>0?"up":d<0?"down":"flat");
     de.textContent=d>0?"+$"+Math.abs(d):d<0?"−$"+Math.abs(d):"—";
-    $("#gauge-fill").style.width=Math.max(0,Math.min(100,100*bankroll/TARGET))+"%";
-    const bet=frame.action==="bet", dec=$("#decision"); dec.className="decision "+(bet?"bet":"pass"); dec.textContent=bet?"BET $"+STAKE:"PASS";
+    $("#gauge-fill").style.width=Math.max(0,Math.min(100,100*bankroll/target))+"%";
+    const bet=frame.action==="bet", dec=$("#decision"); dec.className="decision "+(bet?"bet":"pass"); dec.textContent=bet?"BET $"+stake:"PASS";
     const cue=$("#cue"); cue.innerHTML=""; const on=new Set(frame.cue);
     for(let k=0;k<N;k++){const c=document.createElement("span"); c.className="chip"+(on.has(k)?" on":""); cue.appendChild(c);}
     const res=$("#result"); if(frame.won===true){res.className="result up";res.textContent="WON +$"+Math.abs(d);}
@@ -458,12 +482,13 @@
       else{res.className="result flat";res.textContent="— (passed)";}
     $("#s-round").textContent=roundNo; $("#s-wr").textContent=betsLife?Math.round(100*winsLife/betsLife)+"%":"—"; $("#s-peak").textContent="$"+Math.round(peak);
     $("#life-badge").textContent="life #"+lifeNo+" · live ∞";
+    $("#rich-label").textContent="$"+target+" · rich → reborn";
     const w=MOODW(mood); const mw=$("#mood-word"); mw.textContent=w;
     mw.style.color = mood>=0.4?COL.dopa : mood<-2?COL.pain : COL.mood;
     $("#mood-num").textContent=mood.toFixed(2);
     $("#mood-fill").style.width=Math.round(100*Math.max(0,Math.min(1,-mood/4)))+"%";
     let msg;
-    if(TEMPS[temp].withdrawal===0)
+    if(effWithdrawal()<0.5)
       msg = mood>=0.4 ? "On a winning run — happy, betting freely."
           : mood<-2 ? "Down bad, but this one chases anyway — keeps betting."
           : "Feeling fine — betting on its read of the cue.";
@@ -477,8 +502,8 @@
     $("#p-act").style.width=Math.round(100*frame.pAct)+"%"; $("#p-act-n").textContent=Math.round(100*frame.pAct)+"%";
     drawFlyStage();
     drawBrain();
-    drawSeries("c-bank",bankHist,{ymin:0,ymax:Math.max(TARGET,peak)*1.05,color:COL.gold,fill:"rgba(245,196,81,.08)",
-      guides:[{v:TARGET,label:"$"+TARGET,color:COL.gold},{v:0,label:"$0",color:COL.pain}]});
+    drawSeries("c-bank",bankHist,{ymin:0,ymax:Math.max(target,peak)*1.05,color:COL.gold,fill:"rgba(245,196,81,.08)",
+      guides:[{v:target,label:"$"+target,color:COL.gold},{v:0,label:"$0",color:COL.pain}]});
     drawSeries("c-mood",moodHist,{ymin:-4,ymax:3,color:COL.mood,guides:[{v:0,label:"0",color:COL.dopa}]});
   }
 
@@ -500,10 +525,21 @@
   $("#book-seg").addEventListener("click",e=>{const b=e.target.closest("button"); if(!b)return;
     book=b.dataset.book; for(const x of $("#book-seg").children)x.setAttribute("aria-pressed",x===b); newTheta(); newLife();});
   $("#temp-seg").addEventListener("click",e=>{const b=e.target.closest("button"); if(!b)return;
-    temp=b.dataset.temp; for(const x of $("#temp-seg").children)x.setAttribute("aria-pressed",x===b); newLife();});
+    temp=b.dataset.temp; for(const x of $("#temp-seg").children)x.setAttribute("aria-pressed",x===b);
+    withdrawUser=null; const wp=TEMPS[temp].withdrawal; $("#s-wd").value=wp; $("#wd-v").textContent="preset ("+wp+")";
+    newLife();});
   $("#play").onclick=()=>{ playing=!playing; $("#play").textContent=playing?"⏸ Pause":"▶ Play"; };
   $("#speed").oninput=()=>{ $("#rps-label").textContent=$("#speed").value+" rounds/s"; };
   $("#reset-hist").onclick=()=>{ lives=[]; saveLives(); renderHistory(); };
+  // Lab sliders (live-tune the fly)
+  $("#s-lr").oninput=e=>{ learnRate=+e.target.value; $("#lr-v").textContent=learnRate.toFixed(2); };
+  $("#s-stake").oninput=e=>{ stake=+e.target.value; $("#stake-v").textContent="$"+stake; };
+  $("#s-target").oninput=e=>{ target=+e.target.value; $("#target-v").textContent="$"+target; };
+  $("#s-wd").oninput=e=>{ withdrawUser=+e.target.value; $("#wd-v").textContent=""+withdrawUser; };
+  $("#lab-reset").onclick=()=>{ learnRate=0.09; stake=3; target=100; withdrawUser=null;
+    $("#s-lr").value=0.09; $("#lr-v").textContent="0.09"; $("#s-stake").value=3; $("#stake-v").textContent="$3";
+    $("#s-target").value=100; $("#target-v").textContent="$100";
+    const wp=TEMPS[temp].withdrawal; $("#s-wd").value=wp; $("#wd-v").textContent="preset ("+wp+")"; newLife(); };
   addEventListener("resize",()=>{ kcPts=null; });
 
   loadLives(); renderHistory();

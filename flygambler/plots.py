@@ -153,25 +153,34 @@ def plot_interventions(results, path: str | Path, title: str | None = None):
     fig.suptitle(title or "Interventions on a rigged book — what reduces harm?",
                  fontsize=14, fontweight="bold")
 
-    def bars(a, vals, color, ylabel, fmt="{:.0f}"):
-        b = a.bar(x, vals, color=color, alpha=.9)
+    def bars(a, vals, color, ylabel, fmt="{:.0f}", yerr=None):
+        a.bar(x, vals, color=color, alpha=.9,
+              yerr=yerr, capsize=4, error_kw=dict(ecolor="#cfd6e0", lw=1.4))
         a.set_xticks(x); a.set_xticklabels(names, rotation=20, ha="right", fontsize=9)
         a.set_ylabel(ylabel)
         for xi, v in zip(x, vals):
             a.text(xi, v, fmt.format(v), ha="center", va="bottom", fontsize=9)
-        return b
 
     # highlight the baseline vs the rest
     cols = ["#8d99ae"] + ["#2a9d8f"] * (len(names) - 1)
-    bars(ax[0], [100 * r["ruin_rate"] for r in results], cols, "% of flies ruined", "{:.0f}%")
-    ax[0].set_ylim(0, 105)
+    n = [r.get("n", 1) for r in results]
+    # ruin rate with 95% binomial CI (normal approx)
+    ruin = [100 * r["ruin_rate"] for r in results]
+    ruin_err = [196 * (r["ruin_rate"] * (1 - r["ruin_rate"]) / max(1, ni)) ** 0.5 for r, ni in zip(results, n)]
+    bars(ax[0], ruin, cols, "% of flies ruined", "{:.0f}%", yerr=ruin_err)
+    ax[0].set_ylim(0, 108)
     ax[0].set_title("Ruin rate (lower = safer)", loc="left", fontsize=10)
 
-    bars(ax[1], [r["mean_pain"] for r in results], cols, "mean accumulated pain (Σ prediction-error)")
+    pain = [r["mean_pain"] for r in results]
+    pain_err = [1.96 * r.get("pain_sem", 0) for r in results]
+    bars(ax[1], pain, cols, "mean accumulated pain (Σ prediction-error)", yerr=pain_err)
     ax[1].set_title("Total pain endured (lower = kinder)", loc="left", fontsize=10)
 
     bars(ax[2], [r["median_survival"] for r in results], cols, "median rounds survived")
     ax[2].set_title("Survival (higher = longer before ruin)", loc="left", fontsize=10)
+
+    fig.text(0.5, 0.01, f"error bars: 95% CI · n = {results[0].get('n','?')} random flies per condition",
+             ha="center", fontsize=8, color="#8d99ae")
 
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
